@@ -19,8 +19,9 @@ public class CustomDataPointRepositoryImpl implements CustomDataPointRepository{
     public QueryResult executeQuery(Query query) {
 
         List<String> selectFields = new ArrayList<>();
-        String selectQuery = "SELECT ";
+        String selectQueryPiece = "SELECT ";
         if(query.getFields() == null || query.getFields().isEmpty() || query.getFieldsSelection().equals(QueryTypeEnum.ALL)) {
+            //With more time I'd extract these to a fields enum so they could be reused in different parts of the application
             selectFields.add("temperature");
             selectFields.add("humidity");
             selectFields.add("windSpeed");
@@ -29,47 +30,54 @@ public class CustomDataPointRepositoryImpl implements CustomDataPointRepository{
                 selectFields.add(field);
             }
         }
+        //Creates a db query that selects the fields we want to return and sets the statistic we want this info returned in
         for(int i = 0; i < selectFields.size(); i++) {
-            selectQuery+=query.getStatisticType().toString()+"(d."+selectFields.get(i)+")";
+            selectQueryPiece+=query.getStatisticType().toString()+"(d."+selectFields.get(i)+")";
             if(i<selectFields.size()-1) {
-                selectQuery+=", ";
+                selectQueryPiece+=", ";
             } else {
-                selectQuery+=" ";
+                selectQueryPiece+=" ";
             }
         }
-        selectQuery+="FROM DataPoint d ";
-        String dateSelectionQuery = "";
+        selectQueryPiece+="FROM DataPoint d ";
+
+        String whereQueryPiece = "";
         List<Object[]> results = new ArrayList();
 
+        //creates a DB query depending on weather we need to select by date range / latest per sensor / specific sensors
         if(query.getSensorSelection().equals(QueryTypeEnum.ALL)) {
             if(query.getDateRange() == null) {
-                dateSelectionQuery ="WHERE (d.sensor, d.date) IN (SELECT p.sensor, MAX(p.date) FROM DataPoint p GROUP BY p.sensor)";
-                results = entityManager.createQuery(selectQuery + dateSelectionQuery).getResultList();
+                whereQueryPiece ="WHERE (d.sensor, d.date) IN (SELECT p.sensor, MAX(p.date) FROM DataPoint p GROUP BY p.sensor)";
+                results = entityManager.createQuery(selectQueryPiece + whereQueryPiece).getResultList();
             } else {
-                dateSelectionQuery = "WHERE d.date BETWEEN :startDate AND :endDate";
-                results =  entityManager.createQuery(selectQuery + dateSelectionQuery).setParameter("startDate", query.getDateRange().getStartDate()).setParameter("endDate", query.getDateRange().getEndDate()).getResultList();
+                whereQueryPiece = "WHERE d.date BETWEEN :startDate AND :endDate";
+                results =  entityManager.createQuery(selectQueryPiece + whereQueryPiece).setParameter("startDate", query.getDateRange().getStartDate()).setParameter("endDate", query.getDateRange().getEndDate()).getResultList();
             }
         } else {
             if(query.getDateRange() == null) {
-                dateSelectionQuery = "WHERE d.sensor IN :sensorIds AND (d.sensor, d.date) IN (SELECT p.sensor, MAX(p.date) FROM DataPoint p GROUP BY p.sensor)";
-                results =  entityManager.createQuery(selectQuery + dateSelectionQuery).setParameter("sensorIds", query.getSensors()).getResultList();
+                whereQueryPiece = "WHERE d.sensor IN :sensorIds AND (d.sensor, d.date) IN (SELECT p.sensor, MAX(p.date) FROM DataPoint p GROUP BY p.sensor)";
+                results =  entityManager.createQuery(selectQueryPiece + whereQueryPiece).setParameter("sensorIds", query.getSensors()).getResultList();
             } else {
-                dateSelectionQuery = "WHERE d.sensor IN :sensorIds AND d.date BETWEEN :startDate AND :endDate";
-                results =  entityManager.createQuery(selectQuery + dateSelectionQuery).setParameter("startDate", query.getDateRange().getStartDate()).setParameter("endDate", query.getDateRange().getEndDate()).getResultList();
+                whereQueryPiece = "WHERE d.sensor IN :sensorIds AND d.date BETWEEN :startDate AND :endDate";
+                results =  entityManager.createQuery(selectQueryPiece + whereQueryPiece).setParameter("startDate", query.getDateRange().getStartDate()).setParameter("endDate", query.getDateRange().getEndDate()).getResultList();
             }
         }
+        return getQueryResult(selectFields, results);
+    }
+
+    private static QueryResult getQueryResult(List<String> selectFields, List<Object[]> results) {
         QueryResult toReturn = new QueryResult();
 
         for(int i = 0; i< selectFields.size(); i++) {
             switch (selectFields.get(i)){
                 case "humidity":
-                    toReturn.setHumidity((Double)results.get(0)[i]);
+                    toReturn.setHumidity((Double) results.get(0)[i]);
                     break;
                 case "temperature":
-                    toReturn.setTemperature((Double)results.get(0)[i]);
+                    toReturn.setTemperature((Double) results.get(0)[i]);
                     break;
                 case "windSpeed":
-                    toReturn.setWindSpeed((Double)results.get(0)[i]);
+                    toReturn.setWindSpeed((Double) results.get(0)[i]);
                     break;
             }
         }

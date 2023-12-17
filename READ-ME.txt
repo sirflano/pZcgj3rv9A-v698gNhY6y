@@ -1,0 +1,38 @@
+Coding Challenge
+
+Database uses postgres, defaults to user:postgres pass:password, this can be changed in the application.properties.
+Flyway is used to set up the tables / starting data, no further configuration required.
+Maven is used, run mvn clean install to insure all dependencies are available.
+I used postman to make my calls, example calls are as follows:
+
+POST http://localhost:8080/addDataPoint
+BODY 
+{
+    "sensorId":1,
+
+    "temperature":15,
+
+    "humidity":15,
+
+    "windSpeed":105.2,
+
+    "date":"2023-12-17T17:08:06.192+00:00"
+}
+* all fields required for create DataPoint call
+
+
+GET http://localhost:8080/query
+BODY
+{
+    "sensorSelection":"ALL",
+    "fieldsSelection":"ALL",
+    "statisticType":"MIN",
+    "sensorIds": [1],
+    "fields": ["humidity", "windSpeed"],
+    "dateRangeDTO": {
+        "startDate":"2022-12-17T17:08:06.192+00:00",
+        "endDate":"2023-12-15T17:08:06.192+00:00"
+    }
+}
+* statisticType is always required for query call, options are MIN MAX AVG SUM
+* sensorIds and fields must be provided unless sensorSelection/fieldsSelection are set to ALL
